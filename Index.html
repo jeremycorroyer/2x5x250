@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chrono EPS - 2x5x250m</title>
+  
+  <!-- Apple iOS & iPad PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Chrono 250m">
+  <meta name="theme-color" content="#1e293b">
+  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232563eb'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white'>⏱️</text></svg>">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Custom Styling & Animations -->
+  <style>
+    /* Custom High-Contrast & Touch Adjustments for Outdoor iPad Use */
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .touch-target {
+      min-height: 48px;
+      min-width: 48px;
+    }
+
+    /* Pulse animation for active timing */
+    @keyframes pulse-border {
+      0%, 100% { border-color: rgba(37, 99, 235, 1); }
+      50% { border-color: rgba(37, 99, 235, 0.3); }
+    }
+    .timing-active {
+      animation: pulse-border 1.5s infinite;
+    }
+
+    /* Custom Scrollbar for tables */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #94a3b8;
+      border-radius: 4px;
+    }
+  </style>
+
+  <!-- Dynamic PWA Manifest & Service Worker Registration Script -->
+  <script>
+    // 1. Dynamic Web App Manifest Injection
+    const manifestData = {
+      name: "Chrono EPS - Protocole 2x5x250m",
+      short_name: "Chrono 250m",
+      description: "Application EPS autonome pour le chronométrage du 2x5x250m sur iPad",
+      start_url: "./",
+      display: "standalone",
+      background_color: "#0f172a",
+      theme_color: "#1e293b",
+      icons: [{
+        src: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232563eb'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white'>⏱️</text></svg>",
+        sizes: "192x192 512x512",
+        type: "image/svg+xml"
+      }]
+    };
+    const blobManifest = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+    const manifestURL = URL.createObjectURL(blobManifest);
+    const linkManifest = document.createElement('link');
+    linkManifest.rel = 'manifest';
+    linkManifest.href = manifestURL;
+    document.head.appendChild(linkManifest);
+
+    // 2. Inline Offline Service Worker Registration via Blob
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE_NAME = 'chrono-eps-250m-v1';
+        self.addEventListener('install', (e) => {
+          e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.add(location.href)));
+          self.skipWaiting();
+        });
+        self.addEventListener('activate', (e) => {
+          e.waitUntil(clients.claim());
+        });
+        self.addEventListener('fetch', (e) => {
+          e.respondWith(
+            caches.match(e.request).then(res => res || fetch(e.request).catch(() => caches.match(location.href)))
+          );
+        });
+      `;
+      const blobSW = new Blob([swCode], { type: 'application/javascript' });
+      const swURL = URL.createObjectURL(blobSW);
+      navigator.serviceWorker.register(swURL).catch(err => console.error("SW Registration Error:", err));
+    }
+  </script>
+</head>
+
+<body class="h-full flex flex-col text-slate-900 bg-slate-100 overflow-x-hidden">
+
+  <!-- TOP HEADER / APP BAR -->
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 flex-none">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
+      <!-- Title & Offline Badge -->
+      <div class="flex items-center space-x-3">
+        <div class="bg-blue-600 text-white p-2 rounded-xl text-xl font-black flex items-center justify-center shadow-lg">
+          ⏱️
+        </div>
+        <div>
+          <h1 class="font-extrabold text-lg sm:text-xl tracking-tight leading-none text-white">Chrono 2x5x250m <span class="text-xs bg-amber-500 text-slate-950 font-bold px-1.5 py-0.5 rounded ml-1">EPS</span></h1>
+          <p class="text-xs text-slate-400 font-medium">Chronométrage & Régularité Athlétisme</p>
+        </div>
+      </div>
+
+      <!-- Quick Class & Session Selector Display -->
+      <div class="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+        <span class="text-xs text-slate-400 uppercase font-semibold">Classe/Séance:</span>
+        <span id="activeClassBadge" class="text-xs font-bold text-blue-400">Non sélectionnée</span>
+        <span class="text-slate-600">|</span>
+        <span id="activeSessionBadge" class="text-xs font-bold text-amber-400">Aucune</span>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex space-x-1 bg-slate-800 p-1 rounded-xl">
+        <button id="tabBtnChrono" onclick="switchTab('chrono')" class="tab-btn px-3.5 py-2 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all bg-blue-600 text-white shadow">
+          <span>⏱️</span> <span>Terrain</span>
+        </button>
+        <button id="tabBtnStudents" onclick="switchTab('students')" class="tab-btn px-3.5 py-2 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all text-slate-300 hover:text-white">
+          <span>👥</span> <span>Élèves</span>
+        </button>
+        <button id="tabBtnBilan" onclick="switchTab('bilan')" class="tab-btn px-3.5 py-2 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all text-slate-300 hover:text-white">
+          <span>📊</span> <span>Bilan</span>
+        </button>
+        <button id="tabBtnSettings" onclick="switchTab('settings')" class="tab-btn px-3.5 py-2 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all text-slate-300 hover:text-white">
+          <span>⚙️</span> <span>Sauvegardes</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 flex flex-col gap-4 overflow-y-auto">
+
+    <!-- TAB 1: CHRONO TERRAIN (IPAD FIELD TIMING VIEW) -->
+    <section id="tabContentChrono" class="tab-content flex flex-col gap-4">
+      
+      <!-- Top Control Bar: Series Selector & Wave Selector -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
+        
+        <!-- Series Toggle Buttons -->
+        <div class="flex items-center bg-slate-100 p-1.5 rounded-xl w-full lg:w-auto justify-center">
+          <button id="btnSeries1" onclick="setSeries(1)" class="flex-1 lg:flex-initial px-5 py-2.5 rounded-lg text-sm font-black transition-all bg-blue-600 text-white shadow">
+            SÉRIE 1 (5 x 250m)
+          </button>
+          <button id="btnSeries2" onclick="setSeries(2)" class="flex-1 lg:flex-initial px-5 py-2.5 rounded-lg text-sm font-black transition-all text-slate-600 hover:text-slate-900">
+            SÉRIE 2 (5 x 250m)
+          </button>
+        </div>
+
+        <!-- Active Wave Selector -->
+        <div class="flex items-center space-x-2 w-full lg:w-auto overflow-x-auto pb-1 lg:pb-0">
+          <span class="text-xs font-bold uppercase text-slate-500 whitespace-nowrap">Vague active :</span>
+          <div id="waveSelectorContainer" class="flex space-x-1">
+            <!-- Dynamically populated wave pills -->
+          </div>
+        </div>
+
+        <!-- Global Action: Undo Tap -->
+        <button id="btnUndo" onclick="undoLastTap()" class="w-full lg:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center space-x-2 shadow active:scale-95 transition-all disabled:opacity-40" disabled>
+          <span>↩️</span>
+          <span>ANNULER DERNIER TOP</span>
+        </button>
+      </div>
+
+      <!-- Main Stopwatch Display & Wave Controls -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        
+        <!-- Stopwatch Panel -->
+        <div class="lg:col-span-2 bg-slate-900 text-white rounded-2xl p-5 shadow-lg flex flex-col items-center justify-between border-2 border-slate-800">
+          <div class="w-full flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Chronomètre Départ Groupé Vague</span>
+            <span id="currentWaveDisplayBadge" class="bg-blue-600/30 text-blue-300 font-bold text-xs px-2.5 py-1 rounded-full border border-blue-500/30">
+              Vague : TOUS
+            </span>
+          </div>
+
+          <!-- Digital Clock Display -->
+          <div class="my-3 text-center">
+            <div id="mainTimerDisplay" class="font-mono text-6xl sm:text-7xl font-black text-amber-400 tracking-tight drop-shadow-md">
+              00:00.0
+            </div>
+            <div id="waveTimerSubtext" class="text-xs text-slate-400 mt-1 font-medium">Prêt pour le départ de la vague</div>
+          </div>
+
+          <!-- Big Touch Buttons for Stopwatch -->
+          <div class="grid grid-cols-3 gap-2 sm:gap-3 w-full mt-2">
+            <button id="btnStartWave" onclick="startOrPauseWaveTimer()" class="touch-target bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base sm:text-lg rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center space-x-2 py-3">
+              <span id="startIcon">▶️</span> <span id="startText">DÉPART VAGUE</span>
+            </button>
+            
+            <button onclick="triggerRestTimer(restTimeRepDefault)" class="touch-target bg-blue-600 hover:bg-blue-500 text-white font-black text-sm sm:text-base rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center space-x-1.5 py-3">
+              <span>🔔</span> <span>LANCER RECUP</span>
+            </button>
+
+            <button onclick="requestResetTimer()" class="touch-target bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-rose-200 font-bold text-xs sm:text-sm rounded-xl border border-slate-700 active:scale-95 transition-all flex items-center justify-center space-x-1 py-3">
+              <span>🔄</span> <span>RESET CHRONO</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recovery / Rest Timer Widget -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-black text-slate-800 text-sm uppercase tracking-wide flex items-center space-x-1.5">
+                <span>⏱️</span> <span>Timer de Récupération</span>
+              </h3>
+              <span id="restStatusBadge" class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Inactif</span>
+            </div>
+
+            <div class="text-center py-2">
+              <div id="restTimerDisplay" class="font-mono text-5xl font-black text-slate-800">
+                01:00
+              </div>
+              <p class="text-xs text-slate-500 mt-1">Série active: <span id="restSeriesLabel" class="font-bold text-slate-700">Série 1</span></p>
+            </div>
+          </div>
+
+          <!-- Quick Rest Preset Buttons -->
+          <div class="grid grid-cols-4 gap-1.5 mt-3">
+            <button onclick="triggerRestTimer(45)" class="py-2 bg-slate-100 hover:bg-blue-100 text-slate-800 font-bold text-xs rounded-lg border border-slate-200 transition-all">45s</button>
+            <button onclick="triggerRestTimer(60)" class="py-2 bg-slate-100 hover:bg-blue-100 text-slate-800 font-bold text-xs rounded-lg border border-slate-200 transition-all">1'00</button>
+            <button onclick="triggerRestTimer(90)" class="py-2 bg-slate-100 hover:bg-blue-100 text-slate-800 font-bold text-xs rounded-lg border border-slate-200 transition-all">1'30</button>
+            <button onclick="triggerRestTimer(180)" class="py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs rounded-lg border border-amber-300 transition-all">3'00 (Inter-Série)</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Student Cards Grid (Field Touch Interface) -->
+      <div class="mt-2">
+        <div class="flex items-center justify-between mb-3 px-1">
+          <h2 class="font-extrabold text-slate-800 text-base sm:text-lg flex items-center space-x-2">
+            <span>🏃‍♂️</span> <span>Élèves - Saisie directe par Top Passage</span>
+          </h2>
+          <span class="text-xs text-slate-500 font-semibold" id="studentCountBadge">0 élève(s)</span>
+        </div>
+
+        <!-- Dynamic Grid -->
+        <div id="studentCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+          <!-- Dynamically populated student timing cards -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB 2: CLASSES & ÉLÈVES (MANAGEMENT VIEW) -->
+    <section id="tabContentStudents" class="tab-content hidden flex-col gap-5">
+      
+      <!-- Top Row: Class & Session Selector / Creator -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- Class Box -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-black text-slate-800 text-sm uppercase flex items-center space-x-2">
+              <span>🏫</span> <span>Gestion des Classes</span>
+            </h3>
+            <button onclick="promptCreateClass()" class="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg shadow transition-all">+ Nouvelle Classe</button>
+          </div>
+          <div class="flex items-center space-x-2">
+            <select id="selectClass" onchange="onClassSelectChange()" class="flex-1 bg-slate-50 border border-slate-300 font-bold text-slate-800 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+              <!-- Options loaded dynamically -->
+            </select>
+            <button onclick="promptRenameClass()" title="Renommer la classe" class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-300">✏️</button>
+            <button onclick="promptDeleteClass()" title="Supprimer la classe" class="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200">🗑️</button>
+          </div>
+        </div>
+
+        <!-- Session Box -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-black text-slate-800 text-sm uppercase flex items-center space-x-2">
+              <span>📅</span> <span>Séance / Séquence</span>
+            </h3>
+            <button onclick="promptCreateSession()" class="text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 rounded-lg shadow transition-all">+ Nouvelle Séance</button>
+          </div>
+          <div class="flex items-center space-x-2">
+            <select id="selectSession" onchange="onSessionSelectChange()" class="flex-1 bg-slate-50 border border-slate-300 font-bold text-slate-800 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+              <!-- Options loaded dynamically -->
+            </select>
+            <button onclick="promptRenameSession()" title="Renommer la séance" class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-300">✏️</button>
+            <button onclick="promptDeleteSession()" title="Supprimer la séance" class="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200">🗑️</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Add Students Forms (Single & Mass Import) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        
+        <!-- Batch Import Box -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-3">
+          <h3 class="font-black text-slate-800 text-sm uppercase flex items-center space-x-2">
+            <span>📋</span> <span>Ajout Rapide par Lot / Copier-Coller (Excel / Pronote / Charly)</span>
+          </h3>
+          <p class="text-xs text-slate-500">Collez la liste des noms (un élève par ligne, ex: <em>DUPONT Lucas</em>). Vous pouvez optionnellement spécifier la vague avec un point-virgule (ex: <em>DUPONT Lucas; Vague 1</em>).</p>
+          <textarea id="batchStudentInput" rows="4" placeholder="DUPONT Lucas
+MARTIN Emma; Vague 1
+BERNARD Thomas; Vague 2" class="w-full bg-slate-50 border border-slate-300 p-3 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-bold text-slate-600">Vague par défaut :</span>
+              <select id="defaultBatchWaveSelect" class="bg-slate-100 border border-slate-300 text-xs font-bold rounded-lg p-1.5">
+                <option value="Vague 1">Vague 1</option>
+                <option value="Vague 2">Vague 2</option>
+                <option value="Vague 3">Vague 3</option>
+                <option value="Vague 4">Vague 4</option>
+              </select>
+            </div>
+            <button onclick="submitBatchStudents()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow transition-all">
+              Importer la liste dans la classe
+            </button>
+          </div>
+        </div>
+
+        <!-- Single Student Add -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between gap-3">
+          <div>
+            <h3 class="font-black text-slate-800 text-sm uppercase flex items-center space-x-2 mb-3">
+              <span>👤</span> <span>Ajouter un élève un par un</span>
+            </h3>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs font-bold text-slate-600 block mb-1">Nom Prénom Élève :</label>
+                <input type="text" id="singleStudentName" placeholder="ex: MOREAU Chloe" class="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+              <div>
+                <label class="text-xs font-bold text-slate-600 block mb-1">Vague / Groupe :</label>
+                <select id="singleStudentWave" class="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
+                  <option value="Vague 1">Vague 1</option>
+                  <option value="Vague 2">Vague 2</option>
+                  <option value="Vague 3">Vague 3</option>
+                  <option value="Vague 4">Vague 4</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <button onclick="submitSingleStudent()" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow transition-all">
+            + Ajouter l'élève
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Student List Table -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <h3 class="font-black text-slate-800 text-sm uppercase">Effectif de la classe (<span id="tableStudentCount">0</span>)</h3>
+          <button onclick="clearAllStudentsFromClass()" class="text-xs font-bold text-rose-600 hover:text-rose-800">Vider l'effectif</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-100 text-slate-600 uppercase text-xs font-bold border-b border-slate-200">
+              <tr>
+                <th class="p-3">#</th>
+                <th class="p-3">Élève</th>
+                <th class="p-3">Vague</th>
+                <th class="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="studentListTableBody" class="divide-y divide-slate-100">
+              <!-- Dynamically populated table rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB 3: BILAN & CLASSEMENT (RESULTS & PROJECTION VIEW) -->
+    <section id="tabContentBilan" class="tab-content hidden flex-col gap-4">
+      
+      <!-- Summary Stats & Controls Header -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <h2 class="font-black text-slate-900 text-lg flex items-center space-x-2">
+            <span>🏆</span> <span>Bilan & Résultats : Protocole 2 x 5 x 250 m</span>
+          </h2>
+          <p class="text-xs text-slate-500">Synthèse automatique des moyennes sur les 10 courses, vitesse en km/h et régularité</p>
+        </div>
+
+        <div class="flex items-center space-x-2 w-full md:w-auto">
+          <!-- Filter by wave -->
+          <select id="bilanWaveFilter" onchange="renderBilanTable()" class="bg-slate-100 border border-slate-300 font-bold text-xs rounded-xl p-2.5 outline-none">
+            <option value="ALL">Toutes les vagues</option>
+            <option value="Vague 1">Vague 1</option>
+            <option value="Vague 2">Vague 2</option>
+            <option value="Vague 3">Vague 3</option>
+            <option value="Vague 4">Vague 4</option>
+          </select>
+
+          <!-- Export CSV -->
+          <button onclick="exportSessionToCSV()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center space-x-1.5 whitespace-nowrap">
+            <span>📥</span> <span>Exporter CSV (Excel)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Results Table -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-900 text-white uppercase text-xs font-bold tracking-wider">
+              <tr>
+                <th class="p-3">Rang</th>
+                <th class="p-3">Élève</th>
+                <th class="p-3">Vague</th>
+                <th class="p-3 text-center bg-slate-800">Moy. Série 1 (5x250m)</th>
+                <th class="p-3 text-center bg-slate-800">Moy. Série 2 (5x250m)</th>
+                <th class="p-3 text-center bg-blue-900 text-amber-300">TEMPS MOYEN GLOBAL (10x250m)</th>
+                <th class="p-3 text-center bg-blue-950 text-emerald-400">Vitesse Moy. (km/h)</th>
+                <th class="p-3 text-center">Écart Max-Min</th>
+                <th class="p-3 text-center">Régularité</th>
+                <th class="p-3 text-right">Détails</th>
+              </tr>
+            </thead>
+            <tbody id="bilanTableBody" class="divide-y divide-slate-100 text-slate-800">
+              <!-- Dynamically rendered calculation rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB 4: REGLAGES & IMPORT/EXPORT (SETTINGS & LOCAL STORAGE BACKUP) -->
+    <section id="tabContentSettings" class="tab-content hidden flex-col gap-5">
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        
+        <!-- Backup & Restore Box -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-4">
+          <h3 class="font-black text-slate-900 text-base flex items-center space-x-2">
+            <span>💾</span> <span>Sauvegarde & Exportation Complète</span>
+          </h3>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Toutes les données de vos classes, séances et chronométrages sont automatiquement stockées localement sur votre iPad. Vous pouvez télécharger un fichier JSON complet pour sauvegarder ou transférer vers un autre appareil.
+          </p>
+
+          <div class="space-y-2">
+            <button onclick="exportFullJSONBackup()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2">
+              <span>📥</span> <span>Télécharger Sauvegarde Complète (JSON)</span>
+            </button>
+
+            <div class="pt-2">
+              <label class="block text-xs font-bold text-slate-700 mb-1">Restauration depuis un fichier JSON :</label>
+              <input type="file" id="importJsonInput" accept=".json" onchange="importFullJSONBackup(event)" class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200">
+            </div>
+          </div>
+        </div>
+
+        <!-- App Settings & Presets Box -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between gap-4">
+          <div>
+            <h3 class="font-black text-slate-900 text-base flex items-center space-x-2 mb-3">
+              <span>⚙️</span> <span>Réglages des Timers</span>
+            </h3>
+
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs font-bold text-slate-700 block mb-1">Temps de Récupération par défaut entre les 250m :</label>
+                <select id="settingRestRep" onchange="updateDefaultRestSettings()" class="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-xl text-xs font-bold">
+                  <option value="45">45 secondes</option>
+                  <option value="60" selected>1 minute (60s)</option>
+                  <option value="90">1 minute 30 (90s)</option>
+                  <option value="120">2 minutes (120s)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-bold text-slate-700 block mb-1">Temps de Récupération Inter-Série :</label>
+                <select id="settingRestSeries" onchange="updateDefaultRestSettings()" class="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-xl text-xs font-bold">
+                  <option value="180" selected>3 minutes (180s)</option>
+                  <option value="240">4 minutes (240s)</option>
+                  <option value="300">5 minutes (300s)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+            <button onclick="loadDemoSampleData()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl shadow transition-all">
+              ⚡ Charger Exemple de Classe (Démo)
+            </button>
+            <button onclick="promptResetSessionTimes()" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-200 transition-all">
+              ⚠️ Effacer les temps de la séance
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- EDIT TIMES MODAL -->
+  <div id="editTimesModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-xl w-full p-5 sm:p-6 flex flex-col gap-4 border border-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 id="modalStudentName" class="font-black text-lg text-slate-900">Élève</h3>
+          <p class="text-xs text-slate-500">Modification directe des temps enregistrés (en secondes)</p>
+        </div>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-700 font-bold text-xl p-1">✕</button>
+      </div>
+
+      <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+        <!-- Series 1 inputs -->
+        <div>
+          <h4 class="font-black text-xs uppercase text-blue-600 mb-2">Série 1 (5 x 250m)</h4>
+          <div class="grid grid-cols-5 gap-2" id="modalS1Inputs"></div>
+        </div>
+
+        <!-- Series 2 inputs -->
+        <div>
+          <h4 class="font-black text-xs uppercase text-amber-600 mb-2">Série 2 (5 x 250m)</h4>
+          <div class="grid grid-cols-5 gap-2" id="modalS2Inputs"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+        <button onclick="closeEditModal()" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">Annuler</button>
+        <button onclick="saveStudentModalTimes()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM CONFIRMATION DIALOG MODAL (NO ALERT/CONFIRM) -->
+  <div id="customConfirmModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 flex flex-col gap-4 border border-slate-200">
+      <div class="flex items-center space-x-3 text-amber-500">
+        <span class="text-3xl">⚠️</span>
+        <h3 id="customConfirmTitle" class="font-black text-lg text-slate-900">Confirmation</h3>
+      </div>
+      <p id="customConfirmMessage" class="text-sm text-slate-600">Êtes-vous sûr de vouloir effectuer cette action ?</p>
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button id="customConfirmCancelBtn" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">Annuler</button>
+        <button id="customConfirmOkBtn" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORE APPLICATION LOGIC JS -->
+  <script>
+    /* ==========================================================================
+       1. DATA STRUCTURE & INITIAL STATE MANAGEMENT
+       ========================================================================== */
+    const STORAGE_KEY = 'EPS_2X5X250M_PWA_DATA_V1';
+
+    let appState = {
+      classes: [],
+      sessions: [],
+      activeClassId: null,
+      activeSessionId: null,
+      settings: {
+        restRep: 60,
+        restSeries: 180
+      }
+    };
+
+    // UI Active States
+    let currentTab = 'chrono';
+    let currentSeries = 1; // 1 or 2
+    let activeWaveFilter = 'TOUS'; // 'TOUS', 'Vague 1', etc.
+
+    // Stopwatch State
+    let timerRunning = false;
+    let timerStartTime = 0;
+    let timerElapsedMs = 0;
+    let timerInterval = null;
+    let waveStartTimes = {}; // Stores start time offset per wave
+
+    // Rest Timer State
+    let restTimerRunning = false;
+    let restTimeRemaining = 0;
+    let restTimerInterval = null;
+    let restTimeRepDefault = 60;
+
+    // Action History for Undo Feature
+    let tapHistory = [];
+
+    // Modal State
+    let editingStudentId = null;
+    let confirmCallback = null;
+
+    /* ==========================================================================
+       2. WEB AUDIO SYNTHESIZER (SOUND BEETS FOR FIELD TIMERS)
+       ========================================================================== */
+    function playBeepSound(frequency = 800, duration = 0.15, type = 'sine') {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = frequency;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {
+        // Audio might be muted or context blocked on first gesture
+      }
+    }
+
+    /* ==========================================================================
+       3. STORAGE & PERSISTENCE
+       ========================================================================== */
+    function loadAppData() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          appState = JSON.parse(stored);
+        } catch (e) {
+          console.error("Failed to parse app data", e);
+          initDefaultData();
+        }
+      } else {
+        initDefaultData();
+      }
+      ensureValidSelection();
+      saveAppData();
+    }
+
+    function saveAppData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      updateTopBadges();
+    }
+
+    function initDefaultData() {
+      const defaultClassId = 'cls_' + Date.now();
+      const defaultSessionId = 'sess_' + Date.now();
+
+      appState = {
+        classes: [
+          {
+            id: defaultClassId,
+            name: "3ème B",
+            students: [
+              { id: 'st_1', name: "BENALI Youssef", wave: "Vague 1" },
+              { id: 'st_2', name: "DUBOIS Clara", wave: "Vague 1" },
+              { id: 'st_3', name: "GIRARD Thomas", wave: "Vague 2" },
+              { id: 'st_4', name: "LEROY Manon", wave: "Vague 2" }
+            ]
+          }
+        ],
+        sessions: [
+          {
+            id: defaultSessionId,
+            classId: defaultClassId,
+            name: "Séance 1 - Évaluation Diagnostic",
+            records: {}
+          }
+        ],
+        activeClassId: defaultClassId,
+        activeSessionId: defaultSessionId,
+        settings: { restRep: 60, restSeries: 180 }
+      };
+    }
+
+    function ensureValidSelection() {
+      if (!appState.classes || appState.classes.length === 0) {
+        initDefaultData();
+        return;
+      }
+      if (!appState.classes.find(c => c.id === appState.activeClassId)) {
+        appState.activeClassId = appState.classes[0].id;
+      }
+      const classSessions = appState.sessions.filter(s => s.classId === appState.activeClassId);
+      if (classSessions.length === 0) {
+        const newSessId = 'sess_' + Date.now();
+        appState.sessions.push({
+          id: newSessId,
+          classId: appState.activeClassId,
+          name: "Séance 1",
+          records: {}
+        });
+        appState.activeSessionId = newSessId;
+      } else if (!classSessions.find(s => s.id === appState.activeSessionId)) {
+        appState.activeSessionId = classSessions[0].id;
+      }
+    }
+
+    function getActiveClass() {
+      return appState.classes.find(c => c.id === appState.activeClassId) || null;
+    }
+
+    function getActiveSession() {
+      return appState.sessions.find(s => s.id === appState.activeSessionId) || null;
+    }
+
+    function getStudentRecords(studentId) {
+      const sess = getActiveSession();
+      if (!sess) return { s1: [], s2: [] };
+      if (!sess.records[studentId]) {
+        sess.records[studentId] = { s1: [], s2: [] };
+      }
+      return sess.records[studentId];
+    }
+
+    /* ==========================================================================
+       4. CALCULATIONS & ATHLETIC METRICS (2 x 5 x 250m)
+       ========================================================================== */
+    /**
+     * Calculates speed in km/h for a 250m distance given time in seconds.
+     * Speed (km/h) = (0.25 km / (seconds / 3600)) = 900 / seconds
+     */
+    function calculateSpeedKmh(timeSec) {
+      if (!timeSec || timeSec <= 0) return 0;
+      return 900 / timeSec;
+    }
+
+    function formatTimeSeconds(seconds) {
+      if (!seconds || seconds <= 0) return '--';
+      const mins = Math.floor(seconds / 60);
+      const secs = (seconds % 60).toFixed(1);
+      if (mins > 0) {
+        const padSecs = (seconds % 60) < 10 ? '0' + secs : secs;
+        return `${mins}:${padSecs}s`;
+      }
+      return `${secs}s`;
+    }
+
+    function calculateStudentMetrics(studentId) {
+      const records = getStudentRecords(studentId);
+      const s1 = records.s1 || [];
+      const s2 = records.s2 || [];
+
+      const sum1 = s1.reduce((a, b) => a + b, 0);
+      const avg1 = s1.length > 0 ? sum1 / s1.length : 0;
+      const speed1 = calculateSpeedKmh(avg1);
+
+      const sum2 = s2.reduce((a, b) => a + b, 0);
+      const avg2 = s2.length > 0 ? sum2 / s2.length : 0;
+      const speed2 = calculateSpeedKmh(avg2);
+
+      const allTimes = [...s1, ...s2];
+      const totalSum = allTimes.reduce((a, b) => a + b, 0);
+      const overallAvg = allTimes.length > 0 ? totalSum / allTimes.length : 0;
+      const overallSpeed = calculateSpeedKmh(overallAvg);
+
+      let maxMinDiff = 0;
+      let regularityRating = 'Incomplète';
+      let regularityBadgeClass = 'bg-slate-100 text-slate-500';
+
+      if (allTimes.length >= 2) {
+        const maxT = Math.max(...allTimes);
+        const minT = Math.min(...allTimes);
+        maxMinDiff = maxT - minT;
+
+        if (maxMinDiff < 2.5) {
+          regularityRating = 'Tr. Régulier';
+          regularityBadgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        } else if (maxMinDiff < 5.0) {
+          regularityRating = 'Régulier';
+          regularityBadgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
+        } else if (maxMinDiff < 8.0) {
+          regularityRating = 'Moyen';
+          regularityBadgeClass = 'bg-amber-100 text-amber-800 border-amber-300';
+        } else {
+          regularityRating = 'Irrégulier';
+          regularityBadgeClass = 'bg-rose-100 text-rose-800 border-rose-300';
+        }
+      }
+
+      return {
+        s1Count: s1.length,
+        s1Avg: avg1,
+        s1Speed: speed1,
+        s2Count: s2.length,
+        s2Avg: avg2,
+        s2Speed: speed2,
+        totalCount: allTimes.length,
+        overallAvg: overallAvg,
+        overallSpeed: overallSpeed,
+        maxMinDiff: maxMinDiff,
+        regularityRating: regularityRating,
+        regularityBadgeClass: regularityBadgeClass
+      };
+    }
+
+    /* ==========================================================================
+       5. MAIN STOPWATCH & RECOVERY TIMER ENGINE
+       ========================================================================== */
+    function formatStopwatchMs(ms) {
+      const totalSec = ms / 1000;
+      const mins = Math.floor(totalSec / 60);
+      const secs = Math.floor(totalSec % 60);
+      const tenths = Math.floor((ms % 1000) / 100);
+
+      const mm = mins < 10 ? '0' + mins : mins;
+      const ss = secs < 10 ? '0' + secs : secs;
+      return `${mm}:${ss}.${tenths}`;
+    }
+
+    function startOrPauseWaveTimer() {
+      if (!timerRunning) {
+        timerRunning = true;
+        timerStartTime = Date.now() - timerElapsedMs;
+        
+        // Record wave start time offset
+        waveStartTimes[activeWaveFilter] = Date.now();
+
+        timerInterval = setInterval(() => {
+          timerElapsedMs = Date.now() - timerStartTime;
+          document.getElementById('mainTimerDisplay').innerText = formatStopwatchMs(timerElapsedMs);
+        }, 80);
+
+        document.getElementById('startIcon').innerText = '⏸️';
+        document.getElementById('startText').innerText = 'PAUSE';
+        document.getElementById('btnStartWave').classList.replace('bg-emerald-600', 'bg-amber-600');
+        document.getElementById('waveTimerSubtext').innerText = 'Chrono en cours... Appuyez sur les cartes élèves lors de chaque passage 250m';
+        playBeepSound(900, 0.2);
+      } else {
+        timerRunning = false;
+        clearInterval(timerInterval);
+        document.getElementById('startIcon').innerText = '▶️';
+        document.getElementById('startText').innerText = 'REPRENDRE';
+        document.getElementById('btnStartWave').classList.replace('bg-amber-600', 'bg-emerald-600');
+        document.getElementById('waveTimerSubtext').innerText = 'Chrono en pause';
+      }
+    }
+
+    function requestResetTimer() {
+      showCustomConfirm(
+        "Réinitialiser le chronomètre principal ?",
+        "Le temps du chronomètre terrain sera remis à zéro (les temps déjà attribués aux élèves seront conservés).",
+        () => {
+          timerRunning = false;
+          clearInterval(timerInterval);
+          timerElapsedMs = 0;
+          document.getElementById('mainTimerDisplay').innerText = '00:00.0';
+          document.getElementById('startIcon').innerText = '▶️';
+          document.getElementById('startText').innerText = 'DÉPART VAGUE';
+          document.getElementById('btnStartWave').className = "touch-target bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base sm:text-lg rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center space-x-2 py-3";
+          document.getElementById('waveTimerSubtext').innerText = 'Prêt pour le départ de la vague';
+        }
+      );
+    }
+
+    function triggerRestTimer(seconds) {
+      clearInterval(restTimerInterval);
+      restTimerRunning = true;
+      restTimeRemaining = seconds;
+      
+      const badge = document.getElementById('restStatusBadge');
+      badge.innerText = 'En cours';
+      badge.className = 'text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 animate-pulse';
+
+      playBeepSound(1200, 0.1);
+
+      updateRestDisplay();
+      restTimerInterval = setInterval(() => {
+        restTimeRemaining--;
+        if (restTimeRemaining <= 0) {
+          clearInterval(restTimerInterval);
+          restTimerRunning = false;
+          document.getElementById('restTimerDisplay').innerText = '00:00';
+          badge.innerText = 'TERMINÉ !';
+          badge.className = 'text-xs font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-black';
+          
+          // Play finished beep pattern
+          playBeepSound(1000, 0.3, 'square');
+          setTimeout(() => playBeepSound(1000, 0.3, 'square'), 400);
+          setTimeout(() => playBeepSound(1200, 0.5, 'square'), 800);
+        } else {
+          updateRestDisplay();
+          if (restTimeRemaining <= 3) {
+            playBeepSound(600, 0.1); // Countdown tick
+          }
+        }
+      }, 1000);
+    }
+
+    function updateRestDisplay() {
+      const mins = Math.floor(restTimeRemaining / 60);
+      const secs = restTimeRemaining % 60;
+      const mm = mins < 10 ? '0' + mins : mins;
+      const ss = secs < 10 ? '0' + secs : secs;
+      document.getElementById('restTimerDisplay').innerText = `${mm}:${ss}`;
+    }
+
+    /* ==========================================================================
+       6. FIELD TIMING - RECORDING SPLITS & UNDO
+       ========================================================================== */
+    function recordStudentLap(studentId) {
+      if (timerElapsedMs <= 0) {
+        // If stopwatch hasn't started, notify
+        playBeepSound(300, 0.2, 'sawtooth');
+        showCustomAlert("Chronomètre non démarré", "Veuillez d'abord lancer le 'DÉPART VAGUE' avant d'enregistrer le temps des élèves.");
+        return;
+      }
+
+      const records = getStudentRecords(studentId);
+      const seriesKey = currentSeries === 1 ? 's1' : 's2';
+      const currentList = records[seriesKey];
+
+      if (currentList.length >= 5) {
+        playBeepSound(300, 0.2, 'sawtooth');
+        showCustomAlert("Série complète", `Cet élève a déjà enregistré ses 5 passages pour la Série ${currentSeries}.`);
+        return;
+      }
+
+      // Time recorded in seconds (one decimal place precision)
+      const lapTimeSec = Math.round((timerElapsedMs / 1000) * 10) / 10;
+      currentList.push(lapTimeSec);
+
+      // Add to Undo History
+      tapHistory.push({
+        studentId: studentId,
+        seriesKey: seriesKey,
+        timeSec: lapTimeSec
+      });
+
+      saveAppData();
+      playBeepSound(1100, 0.15, 'sine');
+
+      // Update UI
+      renderStudentCards();
+      document.getElementById('btnUndo').disabled = false;
+    }
+
+    function undoLastTap() {
+      if (tapHistory.length === 0) return;
+      const lastAction = tapHistory.pop();
+      const records = getStudentRecords(lastAction.studentId);
+      const list = records[lastAction.seriesKey];
+
+      if (list && list.length > 0) {
+        list.pop(); // Remove last recorded lap
+        saveAppData();
+        renderStudentCards();
+        playBeepSound(500, 0.15);
+      }
+
+      if (tapHistory.length === 0) {
+        document.getElementById('btnUndo').disabled = true;
+      }
+    }
+
+    /* ==========================================================================
+       7. UI SWITCHING & TAB CONTROL
+       ========================================================================== */
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'text-white', 'shadow');
+        btn.classList.add('text-slate-300');
+      });
+
+      const activeContent = document.getElementById('tabContent' + tabId.charAt(0).toUpperCase() + tabId.slice(1));
+      if (activeContent) activeContent.classList.remove('hidden');
+
+      const activeBtn = document.getElementById('tabBtn' + tabId.charAt(0).toUpperCase() + tabId.slice(1));
+      if (activeBtn) {
+        activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      // Refresh view dynamic data
+      if (tabId === 'chrono') renderChronoTab();
+      if (tabId === 'students') renderStudentsTab();
+      if (tabId === 'bilan') renderBilanTable();
+    }
+
+    function setSeries(seriesNum) {
+      currentSeries = seriesNum;
+      const btn1 = document.getElementById('btnSeries1');
+      const btn2 = document.getElementById('btnSeries2');
+
+      if (seriesNum === 1) {
+        btn1.className = "flex-1 lg:flex-initial px-5 py-2.5 rounded-lg text-sm font-black transition-all bg-blue-600 text-white shadow";
+        btn2.className = "flex-1 lg:flex-initial px-5 py-2.5 rounded-lg text-sm font-black transition-all text-slate-600 hover:text-slate-900";
+        document.getElementById('restSeriesLabel').innerText = "Série 1";
+      } else {
+        btn2.className = "flex-1 lg:flex-initial px-5 py-2.5 rounded-lg text-sm font-black transition-all bg-amber-600 text-white shadow";
+        btn1.className = "flex-1 lg:flex-initial px-5 py-2.5 rounded-lg text-sm font-black transition-all text-slate-600 hover:text-slate-900";
+        document.getElementById('restSeriesLabel').innerText = "Série 2";
+      }
+
+      renderStudentCards();
+    }
+
+    function setWaveFilter(waveName) {
+      activeWaveFilter = waveName;
+      document.getElementById('currentWaveDisplayBadge').innerText = `Vague : ${waveName}`;
+      renderWaveSelectorPills();
+      renderStudentCards();
+    }
+
+    /* ==========================================================================
+       8. RENDERERS (FIELD GRID, TABLES, SELECTORS)
+       ========================================================================== */
+    function updateTopBadges() {
+      const cls = getActiveClass();
+      const sess = getActiveSession();
+      document.getElementById('activeClassBadge').innerText = cls ? cls.name : 'Aucune';
+      document.getElementById('activeSessionBadge').innerText = sess ? sess.name : 'Aucune';
+    }
+
+    function renderChronoTab() {
+      renderWaveSelectorPills();
+      renderStudentCards();
+    }
+
+    function renderWaveSelectorPills() {
+      const container = document.getElementById('waveSelectorContainer');
+      const cls = getActiveClass();
+      
+      // Collect unique waves from student list
+      const waves = ['TOUS', 'Vague 1', 'Vague 2', 'Vague 3', 'Vague 4'];
+      
+      container.innerHTML = waves.map(w => {
+        const isActive = w === activeWaveFilter;
+        const activeClass = isActive 
+          ? 'bg-slate-900 text-white font-black shadow' 
+          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold';
+        return `<button onclick="setWaveFilter('${w}')" class="px-3 py-1.5 rounded-lg text-xs transition-all ${activeClass}">${w}</button>`;
+      }).join('');
+    }
+
+    function renderStudentCards() {
+      const grid = document.getElementById('studentCardsGrid');
+      const cls = getActiveClass();
+      
+      if (!cls || !cls.students || cls.students.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-8 text-center border-2 border-dashed border-slate-300">
+            <span class="text-4xl block mb-2">👥</span>
+            <p class="font-bold text-slate-700">Aucun élève dans cette classe.</p>
+            <p class="text-xs text-slate-500 mt-1">Rendez-vous dans l'onglet "Élèves" pour ajouter votre classe.</p>
+          </div>
+        `;
+        document.getElementById('studentCountBadge').innerText = '0 élève';
+        return;
+      }
+
+      let filteredStudents = cls.students;
+      if (activeWaveFilter !== 'TOUS') {
+        filteredStudents = cls.students.filter(s => (s.wave || 'Vague 1') === activeWaveFilter);
+      }
+
+      document.getElementById('studentCountBadge').innerText = `${filteredStudents.length} élève(s)`;
+
+      if (filteredStudents.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-6 text-center text-slate-500 text-xs font-semibold">
+            Aucun élève affecté à la "${activeWaveFilter}".
+          </div>
+        `;
+        return;
+      }
+
+      const seriesKey = currentSeries === 1 ? 's1' : 's2';
+
+      grid.innerHTML = filteredStudents.map(student => {
+        const records = getStudentRecords(student.id);
+        const currentList = records[seriesKey] || [];
+        const repCount = currentList.length;
+        const isComplete = repCount >= 5;
+
+        const metrics = calculateStudentMetrics(student.id);
+        const lastTime = repCount > 0 ? currentList[repCount - 1] : null;
+        const lastSpeed = lastTime ? calculateSpeedKmh(lastTime).toFixed(1) : '--';
+
+        const btnColor = isComplete 
+          ? 'bg-slate-200 text-slate-500 cursor-not-allowed border-slate-300' 
+          : 'bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shadow-md border-emerald-700';
+
+        return `
+          <div class="bg-white rounded-2xl shadow-sm border-2 ${isComplete ? 'border-emerald-400 bg-emerald-50/30' : 'border-slate-200'} p-4 flex flex-col justify-between transition-all">
+            <!-- Header info -->
+            <div>
+              <div class="flex items-start justify-between gap-1 mb-2">
+                <div>
+                  <h3 class="font-extrabold text-base text-slate-900 leading-snug">${escapeHtml(student.name)}</h3>
+                  <span class="inline-block bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 mt-0.5">${escapeHtml(student.wave || 'Vague 1')}</span>
+                </div>
+                <button onclick="openEditModal('${student.id}')" title="Éditer/Corriger les temps" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg">✏️</button>
+              </div>
+
+              <!-- Repetition Progress Badges -->
+              <div class="flex items-center space-x-1 my-2">
+                ${[1, 2, 3, 4, 5].map(i => {
+                  const done = i <= repCount;
+                  const t = done ? currentList[i - 1] + 's' : `R${i}`;
+                  return `<span class="flex-1 text-center py-1 text-[10px] font-mono font-bold rounded ${done ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}">${t}</span>`;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Main Split Action Button -->
+            <div class="my-3">
+              <button onclick="recordStudentLap('${student.id}')" ${isComplete ? 'disabled' : ''} class="w-full touch-target py-3.5 rounded-xl font-black text-sm uppercase tracking-wide border transition-all flex items-center justify-center space-x-2 ${btnColor}">
+                <span>⏱️</span>
+                <span>${isComplete ? 'Série Terminée' : `TOP PASSAGE (${repCount + 1}/5)`}</span>
+              </button>
+            </div>
+
+            <!-- Footer Stats summary -->
+            <div class="pt-2 border-t border-slate-100 text-xs flex items-center justify-between text-slate-600">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block">Dernier 250m</span>
+                <span class="font-mono font-extrabold text-slate-900 text-sm">${lastTime ? lastTime.toFixed(1) + 's' : '--'}</span>
+                <span class="text-[10px] text-emerald-600 font-bold">(${lastSpeed} km/h)</span>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] uppercase font-bold text-slate-400 block">Moy. S${currentSeries}</span>
+                <span class="font-mono font-extrabold text-blue-600 text-sm">${currentSeries === 1 ? formatTimeSeconds(metrics.s1Avg) : formatTimeSeconds(metrics.s2Avg)}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderStudentsTab() {
+      const classSelect = document.getElementById('selectClass');
+      const sessionSelect = document.getElementById('selectSession');
+
+      // Populate Classes dropdown
+      classSelect.innerHTML = appState.classes.map(c => 
+        `<option value="${c.id}" ${c.id === appState.activeClassId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+      ).join('');
+
+      // Populate Sessions dropdown
+      const activeSessions = appState.sessions.filter(s => s.classId === appState.activeClassId);
+      sessionSelect.innerHTML = activeSessions.map(s => 
+        `<option value="${s.id}" ${s.id === appState.activeSessionId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+      ).join('');
+
+      // Populate Students table
+      const cls = getActiveClass();
+      const tbody = document.getElementById('studentListTableBody');
+      const studentCount = cls && cls.students ? cls.students.length : 0;
+      document.getElementById('tableStudentCount').innerText = studentCount;
+
+      if (!cls || !cls.students || cls.students.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 text-xs font-semibold">Aucun élève enregistré dans cette classe.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = cls.students.map((st, idx) => `
+        <tr class="hover:bg-slate-50 transition-all">
+          <td class="p-3 text-xs font-mono font-bold text-slate-400">${idx + 1}</td>
+          <td class="p-3 font-bold text-slate-900">${escapeHtml(st.name)}</td>
+          <td class="p-3">
+            <select onchange="updateStudentWave('${st.id}', this.value)" class="bg-slate-100 border border-slate-200 text-xs font-bold rounded-lg p-1.5">
+              ${['Vague 1', 'Vague 2', 'Vague 3', 'Vague 4'].map(w => `<option value="${w}" ${st.wave === w ? 'selected' : ''}>${w}</option>`).join('')}
+            </select>
+          </td>
+          <td class="p-3 text-right">
+            <button onclick="deleteStudent('${st.id}')" class="text-xs font-bold text-rose-600 hover:text-rose-800 p-1">Supprimer</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderBilanTable() {
+      const tbody = document.getElementById('bilanTableBody');
+      const cls = getActiveClass();
+      const waveFilter = document.getElementById('bilanWaveFilter').value;
+
+      if (!cls || !cls.students || cls.students.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-slate-400 font-bold text-sm">Aucune donnée d'élève disponible.</td></tr>`;
+        return;
+      }
+
+      let students = cls.students;
+      if (waveFilter !== 'ALL') {
+        students = students.filter(s => (s.wave || 'Vague 1') === waveFilter);
+      }
+
+      // Compute metrics and sort by overall speed descending
+      const computedList = students.map(st => {
+        const metrics = calculateStudentMetrics(st.id);
+        return { student: st, metrics: metrics };
+      });
+
+      computedList.sort((a, b) => b.metrics.overallSpeed - a.metrics.overallSpeed);
+
+      tbody.innerHTML = computedList.map((item, index) => {
+        const st = item.student;
+        const m = item.metrics;
+
+        return `
+          <tr class="hover:bg-blue-50/50 transition-all">
+            <td class="p-3 font-black text-slate-400 text-xs">${index + 1}</td>
+            <td class="p-3 font-extrabold text-slate-900">${escapeHtml(st.name)}</td>
+            <td class="p-3 text-xs font-bold text-slate-500">${escapeHtml(st.wave || 'Vague 1')}</td>
+            <td class="p-3 text-center font-mono font-bold text-slate-700 bg-slate-50">${formatTimeSeconds(m.s1Avg)}</td>
+            <td class="p-3 text-center font-mono font-bold text-slate-700 bg-slate-50">${formatTimeSeconds(m.s2Avg)}</td>
+            <td class="p-3 text-center font-mono font-black text-blue-900 bg-blue-50 text-base">${formatTimeSeconds(m.overallAvg)}</td>
+            <td class="p-3 text-center font-mono font-black text-emerald-700 bg-emerald-50 text-base">${m.overallSpeed > 0 ? m.overallSpeed.toFixed(1) + ' km/h' : '--'}</td>
+            <td class="p-3 text-center font-mono font-bold text-slate-600">${m.maxMinDiff > 0 ? m.maxMinDiff.toFixed(1) + 's' : '--'}</td>
+            <td class="p-3 text-center">
+              <span class="inline-block text-[11px] font-bold px-2.5 py-1 rounded-full border ${m.regularityBadgeClass}">
+                ${m.regularityRating}
+              </span>
+            </td>
+            <td class="p-3 text-right">
+              <button onclick="openEditModal('${st.id}')" class="text-xs font-bold text-blue-600 hover:text-blue-800">Détails</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    /* ==========================================================================
+       9. CLASS & STUDENT MANAGEMENT LOGIC
+       ========================================================================== */
+    function onClassSelectChange() {
+      appState.activeClassId = document.getElementById('selectClass').value;
+      ensureValidSelection();
+      saveAppData();
+      renderStudentsTab();
+    }
+
+    function onSessionSelectChange() {
+      appState.activeSessionId = document.getElementById('selectSession').value;
+      saveAppData();
+      renderStudentsTab();
+    }
+
+    function promptCreateClass() {
+      const className = prompt("Nom de la nouvelle classe (ex: 4ème C) :");
+      if (className && className.trim() !== '') {
+        const newId = 'cls_' + Date.now();
+        appState.classes.push({
+          id: newId,
+          name: className.trim(),
+          students: []
+        });
+        appState.activeClassId = newId;
+        ensureValidSelection();
+        saveAppData();
+        renderStudentsTab();
+      }
+    }
+
+    function promptRenameClass() {
+      const cls = getActiveClass();
+      if (!cls) return;
+      const newName = prompt("Nouveau nom de la classe :", cls.name);
+      if (newName && newName.trim() !== '') {
+        cls.name = newName.trim();
+        saveAppData();
+        renderStudentsTab();
+      }
+    }
+
+    function promptDeleteClass() {
+      const cls = getActiveClass();
+      if (!cls) return;
+      showCustomConfirm(
+        `Supprimer la classe "${cls.name}" ?`,
+        "Toutes les données associées à cette classe seront définitivement supprimées.",
+        () => {
+          appState.classes = appState.classes.filter(c => c.id !== cls.id);
+          appState.sessions = appState.sessions.filter(s => s.classId !== cls.id);
+          ensureValidSelection();
+          saveAppData();
+          renderStudentsTab();
+        }
+      );
+    }
+
+    function promptCreateSession() {
+      const cls = getActiveClass();
+      if (!cls) return;
+      const sessionName = prompt("Nom de la séance (ex: Séance 3 - Évaluation) :");
+      if (sessionName && sessionName.trim() !== '') {
+        const newId = 'sess_' + Date.now();
+        appState.sessions.push({
+          id: newId,
+          classId: cls.id,
+          name: sessionName.trim(),
+          records: {}
+        });
+        appState.activeSessionId = newId;
+        saveAppData();
+        renderStudentsTab();
+      }
+    }
+
+    function promptRenameSession() {
+      const sess = getActiveSession();
+      if (!sess) return;
+      const newName = prompt("Nouveau nom de la séance :", sess.name);
+      if (newName && newName.trim() !== '') {
+        sess.name = newName.trim();
+        saveAppData();
+        renderStudentsTab();
+      }
+    }
+
+    function promptDeleteSession() {
+      const sess = getActiveSession();
+      if (!sess) return;
+      showCustomConfirm(
+        `Supprimer la séance "${sess.name}" ?`,
+        "Tous les chronos enregistrés pour cette séance seront supprimés.",
+        () => {
+          appState.sessions = appState.sessions.filter(s => s.id !== sess.id);
+          ensureValidSelection();
+          saveAppData();
+          renderStudentsTab();
+        }
+      );
+    }
+
+    function submitSingleStudent() {
+      const input = document.getElementById('singleStudentName');
+      const waveSelect = document.getElementById('singleStudentWave');
+      const name = input.value.trim();
+
+      if (!name) return;
+      const cls = getActiveClass();
+      if (!cls) return;
+
+      cls.students.push({
+        id: 'st_' + Date.now() + Math.floor(Math.random() * 1000),
+        name: name,
+        wave: waveSelect.value
+      });
+
+      input.value = '';
+      saveAppData();
+      renderStudentsTab();
+    }
+
+    function submitBatchStudents() {
+      const textarea = document.getElementById('batchStudentInput');
+      const defaultWave = document.getElementById('defaultBatchWaveSelect').value;
+      const lines = textarea.value.split('\n');
+
+      const cls = getActiveClass();
+      if (!cls) return;
+
+      let addedCount = 0;
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        let name = trimmed;
+        let wave = defaultWave;
+
+        if (trimmed.includes(';')) {
+          const parts = trimmed.split(';');
+          name = parts[0].trim();
+          if (parts[1] && parts[1].trim()) wave = parts[1].trim();
+        }
+
+        if (name) {
+          cls.students.push({
+            id: 'st_' + Date.now() + Math.floor(Math.random() * 10000),
+            name: name,
+            wave: wave
+          });
+          addedCount++;
+        }
+      });
+
+      textarea.value = '';
+      saveAppData();
+      renderStudentsTab();
+      showCustomAlert("Importation réussie", `${addedCount} élève(s) ont été ajoutés à la classe.`);
+    }
+
+    function updateStudentWave(studentId, newWave) {
+      const cls = getActiveClass();
+      if (!cls) return;
+      const student = cls.students.find(s => s.id === studentId);
+      if (student) {
+        student.wave = newWave;
+        saveAppData();
+      }
+    }
+
+    function deleteStudent(studentId) {
+      const cls = getActiveClass();
+      if (!cls) return;
+      cls.students = cls.students.filter(s => s.id !== studentId);
+      saveAppData();
+      renderStudentsTab();
+    }
+
+    function clearAllStudentsFromClass() {
+      const cls = getActiveClass();
+      if (!cls) return;
+      showCustomConfirm(
+        "Vider tout l'effectif de la classe ?",
+        "Cette action retirera tous les élèves enregistrés dans cette classe.",
+        () => {
+          cls.students = [];
+          saveAppData();
+          renderStudentsTab();
+        }
+      );
+    }
+
+    /* ==========================================================================
+       10. MANUAL TIME EDITING MODAL LOGIC
+       ========================================================================== */
+    function openEditModal(studentId) {
+      editingStudentId = studentId;
+      const cls = getActiveClass();
+      const student = cls ? cls.students.find(s => s.id === studentId) : null;
+      if (!student) return;
+
+      document.getElementById('modalStudentName').innerText = student.name;
+
+      const records = getStudentRecords(studentId);
+      const s1 = records.s1 || [];
+      const s2 = records.s2 || [];
+
+      const containerS1 = document.getElementById('modalS1Inputs');
+      const containerS2 = document.getElementById('modalS2Inputs');
+
+      containerS1.innerHTML = [0, 1, 2, 3, 4].map(i => `
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block">Rép ${i+1}</label>
+          <input type="number" step="0.1" id="input_s1_${i}" value="${s1[i] !== undefined ? s1[i] : ''}" placeholder="sec" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-center">
+        </div>
+      `).join('');
+
+      containerS2.innerHTML = [0, 1, 2, 3, 4].map(i => `
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 block">Rép ${i+1}</label>
+          <input type="number" step="0.1" id="input_s2_${i}" value="${s2[i] !== undefined ? s2[i] : ''}" placeholder="sec" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-center">
+        </div>
+      `).join('');
+
+      document.getElementById('editTimesModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editTimesModal').classList.add('hidden');
+      editingStudentId = null;
+    }
+
+    function saveStudentModalTimes() {
+      if (!editingStudentId) return;
+      const records = getStudentRecords(editingStudentId);
+
+      const newS1 = [];
+      const newS2 = [];
+
+      for (let i = 0; i < 5; i++) {
+        const val1 = parseFloat(document.getElementById(`input_s1_${i}`).value);
+        if (!isNaN(val1) && val1 > 0) newS1.push(val1);
+
+        const val2 = parseFloat(document.getElementById(`input_s2_${i}`).value);
+        if (!isNaN(val2) && val2 > 0) newS2.push(val2);
+      }
+
+      records.s1 = newS1;
+      records.s2 = newS2;
+
+      saveAppData();
+      closeEditModal();
+
+      if (currentTab === 'chrono') renderStudentCards();
+      if (currentTab === 'bilan') renderBilanTable();
+    }
+
+    /* ==========================================================================
+       11. EXPORT / IMPORT & BACKUP (JSON / CSV EXCEL COMPATIBLE)
+       ========================================================================== */
+    function exportSessionToCSV() {
+      const cls = getActiveClass();
+      const sess = getActiveSession();
+      if (!cls || !cls.students || cls.students.length === 0) {
+        showCustomAlert("Aucune donnée", "Il n'y a pas de données à exporter.");
+        return;
+      }
+
+      // French Excel CSV format: UTF-8 with BOM and semicolon separator
+      let csv = '\uFEFF';
+      csv += 'Classe;Séance;Nom Élève;Vague;S1-R1;S1-R2;S1-R3;S1-R4;S1-R5;Moyenne S1 (s);S2-R1;S2-R2;S2-R3;S2-R4;S2-R5;Moyenne S2 (s);Temps Moyen Global (s);Temps Moyen (format);Vitesse Moyenne (km/h);Ecart Max-Min (s);Regularite\n';
+
+      cls.students.forEach(st => {
+        const rec = getStudentRecords(st.id);
+        const s1 = rec.s1 || [];
+        const s2 = rec.s2 || [];
+        const m = calculateStudentMetrics(st.id);
+
+        const row = [
+          `"${cls.name}"`,
+          `"${sess ? sess.name : ''}"`,
+          `"${st.name}"`,
+          `"${st.wave || 'Vague 1'}"`,
+          s1[0] || '', s1[1] || '', s1[2] || '', s1[3] || '', s1[4] || '',
+          m.s1Avg ? m.s1Avg.toFixed(1).replace('.', ',') : '',
+          s2[0] || '', s2[1] || '', s2[2] || '', s2[3] || '', s2[4] || '',
+          m.s2Avg ? m.s2Avg.toFixed(1).replace('.', ',') : '',
+          m.overallAvg ? m.overallAvg.toFixed(1).replace('.', ',') : '',
+          `"${formatTimeSeconds(m.overallAvg)}"`,
+          m.overallSpeed ? m.overallSpeed.toFixed(1).replace('.', ',') : '',
+          m.maxMinDiff ? m.maxMinDiff.toFixed(1).replace('.', ',') : '',
+          `"${m.regularityRating}"`
+        ];
+
+        csv += row.join(';') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Chrono_250m_${cls.name.replace(/\s+/g, '_')}_${sess ? sess.name.replace(/\s+/g, '_') : 'Seance'}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function exportFullJSONBackup() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `Sauvegarde_EPS_2x5x250m_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importFullJSONBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed && parsed.classes && parsed.sessions) {
+            appState = parsed;
+            saveAppData();
+            switchTab('chrono');
+            showCustomAlert("Restauration réussie", "Toutes vos données de classes et séances ont été restaurées.");
+          } else {
+            showCustomAlert("Fichier invalide", "Le fichier sélectionné ne correspond pas au format de sauvegarde requis.");
+          }
+        } catch (err) {
+          showCustomAlert("Erreur de lecture", "Impossible de lire le fichier JSON.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function updateDefaultRestSettings() {
+      const repVal = parseInt(document.getElementById('settingRestRep').value, 10);
+      const seriesVal = parseInt(document.getElementById('settingRestSeries').value, 10);
+      appState.settings = { restRep: repVal, restSeries: seriesVal };
+      restTimeRepDefault = repVal;
+      saveAppData();
+    }
+
+    function promptResetSessionTimes() {
+      const sess = getActiveSession();
+      if (!sess) return;
+      showCustomConfirm(
+        "Effacer tous les chronos de la séance active ?",
+        "Les élèves seront conservés mais leurs temps enregistrés pour cette séance seront réinitialisés à zéro.",
+        () => {
+          sess.records = {};
+          saveAppData();
+          switchTab('chrono');
+        }
+      );
+    }
+
+    function loadDemoSampleData() {
+      const demoClassId = 'cls_demo';
+      const demoSessId = 'sess_demo';
+
+      const demoStudents = [
+        { id: 'st_d1', name: "DURAND Maxime", wave: "Vague 1" },
+        { id: 'st_d2', name: "MOREL Camille", wave: "Vague 1" },
+        { id: 'st_d3', name: "PETIT Lucas", wave: "Vague 2" },
+        { id: 'st_d4', name: "ROUX Sarah", wave: "Vague 2" },
+        { id: 'st_d5', name: "FOURNIER Antoine", wave: "Vague 3" }
+      ];
+
+      const demoRecords = {
+        'st_d1': { s1: [46.5, 47.2, 48.0, 47.8, 48.5], s2: [48.0, 48.8, 49.5, 50.1, 50.0] },
+        'st_d2': { s1: [52.0, 53.1, 52.8, 54.0, 53.5], s2: [54.2, 55.0, 55.5, 56.0, 55.8] },
+        'st_d3': { s1: [44.0, 44.5, 45.2, 45.0, 46.1], s2: [46.0, 47.0, 47.5, 48.2, 48.0] }
+      };
+
+      appState.classes.unshift({
+        id: demoClassId,
+        name: "3ème A (Exemple)",
+        students: demoStudents
+      });
+
+      appState.sessions.unshift({
+        id: demoSessId,
+        classId: demoClassId,
+        name: "Séance Évaluation 250m",
+        records: demoRecords
+      });
+
+      appState.activeClassId = demoClassId;
+      appState.activeSessionId = demoSessId;
+
+      saveAppData();
+      switchTab('chrono');
+      showCustomAlert("Données Démo chargées", "Une classe d'exemple a été ajoutée pour tester le protocole.");
+    }
+
+    /* ==========================================================================
+       12. CUSTOM MODAL ALERTS / DIALOGS (NO ALERT OR CONFIRM)
+       ========================================================================== */
+    function showCustomAlert(title, message) {
+      document.getElementById('customConfirmTitle').innerText = title;
+      document.getElementById('customConfirmMessage').innerText = message;
+      document.getElementById('customConfirmCancelBtn').classList.add('hidden');
+      document.getElementById('customConfirmOkBtn').innerText = "D'accord";
+      
+      const modal = document.getElementById('customConfirmModal');
+      modal.classList.remove('hidden');
+
+      const okBtn = document.getElementById('customConfirmOkBtn');
+      const newOkBtn = okBtn.cloneNode(true);
+      okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+
+      newOkBtn.onclick = () => {
+        modal.classList.add('hidden');
+      };
+    }
+
+    function showCustomConfirm(title, message, onConfirm) {
+      document.getElementById('customConfirmTitle').innerText = title;
+      document.getElementById('customConfirmMessage').innerText = message;
+      document.getElementById('customConfirmCancelBtn').classList.remove('hidden');
+      document.getElementById('customConfirmOkBtn').innerText = "Confirmer";
+
+      const modal = document.getElementById('customConfirmModal');
+      modal.classList.remove('hidden');
+
+      const okBtn = document.getElementById('customConfirmOkBtn');
+      const cancelBtn = document.getElementById('customConfirmCancelBtn');
+
+      const newOkBtn = okBtn.cloneNode(true);
+      okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+
+      const newCancelBtn = cancelBtn.cloneNode(true);
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+      newOkBtn.onclick = () => {
+        modal.classList.add('hidden');
+        if (onConfirm) onConfirm();
+      };
+
+      newCancelBtn.onclick = () => {
+        modal.classList.add('hidden');
+      };
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    /* ==========================================================================
+       13. INIT ON LOAD
+       ========================================================================== */
+    window.onload = function() {
+      loadAppData();
+      switchTab('chrono');
+    };
+  </script>
+</body>
+</html>
